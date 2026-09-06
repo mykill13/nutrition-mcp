@@ -16,6 +16,7 @@ import {
 } from "./supabase.js";
 import { getRecentPosts } from "./patreon.js";
 import { registerDiscoveryRoutes } from "./discovery.js";
+import { registerDashboardRoute } from "./dashboard.js";
 import { maskIp } from "./net.js";
 import { warmWidgets } from "./widgets.js";
 import { ALT_PAGES, LOCALES, PAGE_ROUTES } from "./routes.js";
@@ -189,6 +190,8 @@ app.get("/.well-known/glama.json", (c) => {
 
 // OAuth routes
 app.route("/", createOAuthRouter());
+
+registerDashboardRoute(app);
 
 // MCP endpoint (protected). banRepeatAuthFailures runs first so a client stuck
 // in a failed-auth retry loop is rejected before any token verification.
