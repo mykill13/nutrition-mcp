@@ -164,6 +164,7 @@ export function registerDashboardRoute(app: Hono): void {
                 mealRows: mealRows || `<div class="empty">Nothing logged yet today.</div>`,
                 weightRow,
                 token,
+                awakeFrac: awakeFraction(tz),
             });
 
             return c.html(html);
@@ -186,6 +187,27 @@ function formatWeightLine(
         day: "numeric",
     }).format(new Date(loggedAt));
     return `${fromGrams(weightG, unit)} ${unit} <span class="row-sub-inline">(${date})</span>`;
+}
+
+/**
+ * Fraction (0–1) of the way through the "awake window" (6:00am–9:00pm, 15h)
+ * the given moment is, in the given timezone. 0 before 6am, 1 at/after 9pm —
+ * so the ring is empty overnight and full once the day's awake hours are spent,
+ * same shape as the calorie ring rather than wrapping past a full circle.
+ */
+function awakeFraction(tz: string, now: Date = new Date()): number {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hourCycle: "h23",
+    }).formatToParts(now);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+    const hourDecimal = get("hour") + get("minute") / 60 + get("second") / 3600;
+    const WINDOW_START = 6; // 6:00am
+    const WINDOW_HOURS = 15; // through 9:00pm
+    return Math.min(1, Math.max(0, (hourDecimal - WINDOW_START) / WINDOW_HOURS));
 }
 
 /** A compact stat block (fiber/sugar/alcohol/caffeine): value + thin bar or "no goal set". */
@@ -243,6 +265,7 @@ function renderPage(opts: {
     mealRows: string;
     weightRow: string;
     token: string;
+    awakeFrac: number;
 }): string {
     const {
         today,
@@ -254,6 +277,7 @@ function renderPage(opts: {
         mealRows,
         weightRow,
         token,
+        awakeFrac,
     } = opts;
 
     const heroOver = calGoal != null && calRemaining! < 0;
@@ -267,6 +291,12 @@ function renderPage(opts: {
     const CIRC = 339.3;
     const ringOffset = CIRC - (CIRC * pct) / 100;
     const ringColor = heroOver ? "#e0785a" : "#e0a63a";
+
+    // Inner ring: awake-hours-elapsed, concentric inside the calorie ring.
+    // circumference for r=38 is 2*pi*38 ≈ 238.8
+    const AWAKE_CIRC = 238.8;
+    const awakePct = Math.round(awakeFrac * 100);
+    const awakeOffset = AWAKE_CIRC - AWAKE_CIRC * awakeFrac;
 
     const drinkUnitG = 14; // US standard drink; matches set_alcohol_tracking's "us" default
     const drinksNote =
@@ -300,7 +330,11 @@ function renderPage(opts: {
   .ring-wrap { position: relative; width: 128px; height: 128px; flex-shrink: 0; }
   .ring-wrap svg { transform: rotate(-90deg); }
   .ring-pct { position: absolute; inset: 0; display: flex; align-items: center;
-    justify-content: center; font-size: 20px; font-weight: 700; color: ${ringColor}; }
+    justify-content: center; font-size: 18px; font-weight: 700; color: ${ringColor};
+    transform: translateY(-9px); }
+  .awake-pct { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 11px; font-weight: 600; color: #5b9bd9;
+    transform: translateY(11px); }
   .hero-num { font-size: 40px; font-weight: 800; line-height: 1; color: #f3f3f3; }
   .hero-num.over { color: #ff8a6b; }
   .hero-label { color: #9aa0aa; font-size: 14px; margin-top: 6px; }
@@ -346,8 +380,12 @@ function renderPage(opts: {
         <circle cx="64" cy="64" r="54" fill="none" stroke="#23262b" stroke-width="12" />
         <circle cx="64" cy="64" r="54" fill="none" stroke="${ringColor}" stroke-width="12"
           stroke-linecap="round" stroke-dasharray="${CIRC}" stroke-dashoffset="${ringOffset}" />
+        <circle cx="64" cy="64" r="38" fill="none" stroke="#1d2a38" stroke-width="7" />
+        <circle cx="64" cy="64" r="38" fill="none" stroke="#5b9bd9" stroke-width="7"
+          stroke-linecap="round" stroke-dasharray="${AWAKE_CIRC}" stroke-dashoffset="${awakeOffset}" />
       </svg>
       <div class="ring-pct">${calGoal != null ? pct + "%" : ""}</div>
+      <div class="awake-pct">${awakePct}%</div>
     </div>
     <div>
       <div class="hero-num${heroOver ? " over" : ""}">${heroValue.toLocaleString()}</div>
