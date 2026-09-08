@@ -292,11 +292,12 @@ function renderPage(opts: {
     const ringOffset = CIRC - (CIRC * pct) / 100;
     const ringColor = heroOver ? "#e0785a" : "#e0a63a";
 
-    // Inner ring: awake-hours-elapsed, concentric inside the calorie ring.
-    // circumference for r=38 is 2*pi*38 ≈ 238.8
-    const AWAKE_CIRC = 238.8;
-    const awakePct = Math.round(awakeFrac * 100);
-    const awakeOffset = AWAKE_CIRC - AWAKE_CIRC * awakeFrac;
+    // Awake-hours-elapsed: a solid disc inside the calorie ring, filled
+    // clockwise from 12 o'clock via conic-gradient (its 0deg is "to top",
+    // matching the ring's rotated coordinate space) — two close shades of
+    // the same blue rather than a second competing ring.
+    const awakeDeg = Math.round(awakeFrac * 360);
+    const awakeFillCss = `background: conic-gradient(#5b9bd9 0deg ${awakeDeg}deg, #223447 ${awakeDeg}deg 360deg);`;
 
     const drinkUnitG = 14; // US standard drink; matches set_alcohol_tracking's "us" default
     const drinksNote =
@@ -330,11 +331,9 @@ function renderPage(opts: {
   .ring-wrap { position: relative; width: 128px; height: 128px; flex-shrink: 0; }
   .ring-wrap svg { transform: rotate(-90deg); }
   .ring-pct { position: absolute; inset: 0; display: flex; align-items: center;
-    justify-content: center; font-size: 18px; font-weight: 700; color: ${ringColor};
-    transform: translateY(-9px); }
-  .awake-pct { position: absolute; inset: 0; display: flex; align-items: center;
-    justify-content: center; font-size: 11px; font-weight: 600; color: #5b9bd9;
-    transform: translateY(11px); }
+    justify-content: center; font-size: 20px; font-weight: 700; color: ${ringColor}; }
+  .awake-fill { position: absolute; top: 50%; left: 50%; width: 76px; height: 76px;
+    border-radius: 50%; transform: translate(-50%, -50%); }
   .hero-num { font-size: 40px; font-weight: 800; line-height: 1; color: #f3f3f3; }
   .hero-num.over { color: #ff8a6b; }
   .hero-label { color: #9aa0aa; font-size: 14px; margin-top: 6px; }
@@ -376,16 +375,13 @@ function renderPage(opts: {
 
   <div class="card hero-card">
     <div class="ring-wrap">
+      <div class="awake-fill" style="${awakeFillCss}"></div>
       <svg width="128" height="128" viewBox="0 0 128 128">
         <circle cx="64" cy="64" r="54" fill="none" stroke="#23262b" stroke-width="12" />
         <circle cx="64" cy="64" r="54" fill="none" stroke="${ringColor}" stroke-width="12"
           stroke-linecap="round" stroke-dasharray="${CIRC}" stroke-dashoffset="${ringOffset}" />
-        <circle cx="64" cy="64" r="38" fill="none" stroke="#1d2a38" stroke-width="7" />
-        <circle cx="64" cy="64" r="38" fill="none" stroke="#5b9bd9" stroke-width="7"
-          stroke-linecap="round" stroke-dasharray="${AWAKE_CIRC}" stroke-dashoffset="${awakeOffset}" />
       </svg>
       <div class="ring-pct">${calGoal != null ? pct + "%" : ""}</div>
-      <div class="awake-pct">${awakePct}%</div>
     </div>
     <div>
       <div class="hero-num${heroOver ? " over" : ""}">${heroValue.toLocaleString()}</div>
